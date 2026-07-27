@@ -623,7 +623,8 @@ async def check_piarflow_sponsors(user: User) -> list:
                     data = await resp.json()
                     sponsors = data.get("sponsors") or []
                     if sponsors:
-                        links = [s["link"] for s in sponsors if s.get("link")]
+                        # Защита: проверяем что s является словарем перед использованием get
+                        links = [s.get("link") for s in sponsors if isinstance(s, dict) and s.get("link")]
                         if links:
                             check_payload = {
                                 "user_id": int(user.id),
@@ -634,26 +635,28 @@ async def check_piarflow_sponsors(user: User) -> list:
                                     check_data = await check_resp.json()
                                     checked_sponsors = check_data.get("sponsors") or []
                                     for item in checked_sponsors:
-                                        if item.get("status") != "subscribed":
+                                        if isinstance(item, dict) and item.get("status") != "subscribed":
                                             link = item.get("link")
-                                            not_subbed.append({
-                                                'name': "Спонсор",
-                                                'url': link,
-                                                'icon_custom_emoji_id': "6039381989985882045"
-                                            })
+                                            name = item.get("title", "Спонсор")
+                                            if link:
+                                                not_subbed.append({
+                                                    'name': name,
+                                                    'url': link,
+                                                    'icon_custom_emoji_id': "6039381989985882045"
+                                                })
                                 else:
                                     for s in sponsors:
-                                        if s.get("status") != "subscribed" and s.get("link"):
+                                        if isinstance(s, dict) and s.get("status") != "subscribed" and s.get("link"):
                                             not_subbed.append({
-                                                'name': "Спонсор",
+                                                'name': s.get("title", "Спонсор"),
                                                 'url': s.get("link"),
                                                 'icon_custom_emoji_id': "6039381989985882045"
                                             })
                         else:
                             for s in sponsors:
-                                if s.get("status") != "subscribed" and s.get("link"):
+                                if isinstance(s, dict) and s.get("status") != "subscribed" and s.get("link"):
                                     not_subbed.append({
-                                        'name': "Спонсор",
+                                        'name': s.get("title", "Спонсор"),
                                         'url': s.get("link"),
                                         'icon_custom_emoji_id': "6039381989985882045"
                                     })
@@ -681,49 +684,60 @@ async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]
                 is_fully_subscribed = False
                 not_subscribed_channels.append({'name': name, 'url': url, 'icon_custom_emoji_id': "6039381989985882045"})
 
-    # 2. PiarFlow API
-    try:
-        pf_unsubbed = await check_piarflow_sponsors(user)
-        if pf_unsubbed:
-            is_fully_subscribed = False
-            not_subscribed_channels.extend(pf_unsubbed)
-    except Exception as e:
-        logging.error(f"PiarFlow check error: {e}")
-
-    # 3. TGrass API
-    try:
-        url = "https://tgrass.space/offers"
-        headers = {"accept": "application/json", "Content-Type": "application/json", "Auth": TGRASS_API_KEY}
-        payload = {"tg_user_id": int(user.id), "tg_login": user.username or "", "lang": user.language_code or "en", "is_premium": user.is_premium or False}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
-                if response.status == 200:
-                    resp_json = await response.json()
-                    if resp_json.get("status") == "not_ok":
-                         is_fully_subscribed = False
-                         for offer in resp_json.get("offers", []):
-                             not_subscribed_channels.append({'name': f" {offer.get('title', 'Спонсор')}", 'url': offer['link'], 'icon_custom_emoji_id': "6039381989985882045"})
-    except Exception as e:
-        logging.error(f"TGrass check error: {e}")
-
-    # 4. BotoHub API
-    try:
-        if BOTOHUB_API_KEY:
-            bh_url = "https://botohub.me/get-tasks"
-            bh_headers = {"Content-Type": "application/json", "Auth": BOTOHUB_API_KEY}
-            bh_payload = {"chat_id": int(user.id)}
+    # 2. TGrass API, Botohub API, PiarFlow выполняются параллельно для скорости
+    async def check_tgrass():
+        res = []
+        try:
+            url = "https://tgrass.space/offers"
+            headers = {"accept": "application/json", "Content-Type": "application/json", "Auth": TGRASS_API_KEY}
+            payload = {"tg_user_id": int(user.id), "tg_login": user.username or "", "lang": user.language_code or "en", "is_premium": user.is_premium or False}
             async with aiohttp.ClientSession() as session:
-                async with session.post(bh_url, json=bh_payload, headers=bh_headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
                     if response.status == 200:
-                        bh_json = await response.json()
-                        if not bh_json.get("skip", False) and not bh_json.get("completed", False):
-                            tasks = bh_json.get("tasks", [])
-                            if tasks:
-                                is_fully_subscribed = False
-                                for i, task_url in enumerate(tasks, 1):
-                                    not_subscribed_channels.append({'name': f"Спонсор", 'url': task_url, 'icon_custom_emoji_id': "6039381989985882045"})
-    except Exception as e:
-        logging.error(f"Botohub check error: {e}")
+                        resp_json = await response.json()
+                        if resp_json.get("status") == "not_ok" or resp_json.get("offers"):
+                             for offer in resp_json.get("offers", []):
+                                 if isinstance(offer, dict):
+                                     link = offer.get('link') or offer.get('url')
+                                     if link:
+                                         res.append({'name': offer.get('title', 'Спонсор'), 'url': link, 'icon_custom_emoji_id': "6039381989985882045"})
+        except Exception as e:
+            logging.error(f"TGrass check error: {e}")
+        return res
+
+    async def check_botohub():
+        res = []
+        try:
+            if BOTOHUB_API_KEY:
+                bh_url = "https://botohub.me/get-tasks"
+                bh_headers = {"Content-Type": "application/json", "Auth": BOTOHUB_API_KEY}
+                bh_payload = {"chat_id": int(user.id)}
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(bh_url, json=bh_payload, headers=bh_headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                        if response.status == 200:
+                            bh_json = await response.json()
+                            if not bh_json.get("skip", False) and not bh_json.get("completed", False):
+                                tasks = bh_json.get("tasks", [])
+                                for i, task in enumerate(tasks, 1):
+                                    t_url = task.get("url") if isinstance(task, dict) else task
+                                    t_name = task.get("title", f"Спонсор") if isinstance(task, dict) else f"Спонсор"
+                                    # Защита от падения: добавляем только если ссылка действительно строка
+                                    if t_url and isinstance(t_url, str):
+                                        res.append({'name': t_name, 'url': t_url, 'icon_custom_emoji_id': "6039381989985882045"})
+        except Exception as e:
+            logging.error(f"Botohub check error: {e}")
+        return res
+
+    async def check_piarflow():
+        return await check_piarflow_sponsors(user)
+
+    # Параллельный запуск всех 3 спонсоров 
+    results = await asyncio.gather(check_piarflow(), check_tgrass(), check_botohub(), return_exceptions=True)
+    
+    for res in results:
+        if isinstance(res, list) and res:
+            is_fully_subscribed = False
+            not_subscribed_channels.extend(res)
 
     return is_fully_subscribed, not_subscribed_channels
 
