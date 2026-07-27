@@ -37,6 +37,9 @@ START_PHOTO_URL = "https://freeimage.host/i/CkFEO4S"
 #sulik
 TGRASS_API_KEY = "4a1f3982b48c482391b0d857439327e1"
 
+#botohub
+BOTOHUB_API_KEY = "6c228d0a-6a31-4703-bb76-f4d0fe7a2dfc"
+
 #sulik - CUSTOM EMOJILER
 EMOJI_IDS = {
     "start": "5895288332581082241",
@@ -624,6 +627,24 @@ async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]
                              not_subscribed_channels.append({'name': f" {offer.get('title', 'Спонсор')}", 'url': offer['link']})
     except Exception as e:
         logging.error(f"TGrass check error: {e}")
+
+    try:
+        if BOTOHUB_API_KEY:
+            bh_url = "https://botohub.me/get-tasks"
+            bh_headers = {"Content-Type": "application/json", "Auth": BOTOHUB_API_KEY}
+            bh_payload = {"chat_id": int(user.id)}
+            async with aiohttp.ClientSession() as session:
+                async with session.post(bh_url, json=bh_payload, headers=bh_headers) as response:
+                    if response.status == 200:
+                        bh_json = await response.json()
+                        if not bh_json.get("skip", False) and not bh_json.get("completed", False):
+                            tasks = bh_json.get("tasks", [])
+                            if tasks:
+                                is_fully_subscribed = False
+                                for i, task_url in enumerate(tasks, 1):
+                                    not_subscribed_channels.append({'name': f"Спонсор {i}", 'url': task_url, 'icon_custom_emoji_id': "6021418126061605425"})
+    except Exception as e:
+        logging.error(f"Botohub check error: {e}")
 
     return is_fully_subscribed, not_subscribed_channels
 
@@ -1266,7 +1287,7 @@ async def start_broadcast(call: CallbackQuery, state: FSMContext):
 async def process_broadcast(message: Message, state: FSMContext, bot: Bot):
     await state.clear()
     user_ids = db.get_all_user_ids()
-    sent, failed = 0, 0
+    sent, failed = 0, 0;
     status_message = await message.answer(f"🚀 Отправка {len(user_ids)} пользователям...")
     for user_id in user_ids:
         try:
@@ -1353,7 +1374,7 @@ async def admin_add_admin_process(message: Message, state: FSMContext, bot: Bot)
 @dp.callback_query(F.data.startswith("admin_remove_admin_"), IsChiefAdmin())
 async def admin_remove_admin(call: CallbackQuery):
     admin_id_to_remove = int(call.data.split("_")[-1])
-    if admin_id_to_remove == call.from_user.id:
+    if admin_id_to_remove == call.fromuser.id:
         await call.answer("❌ Вы не можете удалить самого себя.", show_alert=True)
         return
     db.remove_admin(admin_id_to_remove)
