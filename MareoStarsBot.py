@@ -21,7 +21,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramAPIError, ClientDecod
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from typing import Callable, Dict, Any, Awaitable, Union
 
-# sulikbaba
+# milas_devx
 BOT_TOKEN = "8842438618:AAGk3DQyNaYppuCZNLRXJdzJfXDTrGGPdI8"
 ADMIN_IDS = [7569831989]
 CHIEF_ADMIN_ID = ADMIN_IDS[0] if ADMIN_IDS else None
@@ -31,16 +31,20 @@ PAYMENTS_CHANNEL_LINK = "https://t.me/MAREO_STARSPAY"
 MIN_REFERRALS_FOR_WITHDRAWAL = 10
 DB_FILE = "MareoStars.db"
 
-# sulik
+# milas
 START_PHOTO_URL = "https://freeimage.host/i/CkFEO4S"
 
-#sulik
+# milas
 TGRASS_API_KEY = "4a1f3982b48c482391b0d857439327e1"
 
-#botohub
+# botohub
 BOTOHUB_API_KEY = "6c228d0a-6a31-4703-bb76-f4d0fe7a2dfc"
 
-#sulik - CUSTOM EMOJILER
+# piarflow
+PIARFLOW_API_KEY = "_qyZYD5EoxHImjEv37nRTbKkrYMGQP-7"
+PIARFLOW_API_URL = "https://piarflow.com/v1"
+
+# milas - CUSTOM EMOJILER
 EMOJI_IDS = {
     "start": "5895288332581082241",
     "star": "5258185631355378853",
@@ -155,14 +159,20 @@ def get_text(key: str, **kwargs):
         return text.format(**kwargs)
     return text
 
-# --- ДОБАВЛЕНО: ФУНКЦИЯ ДЛЯ ВЫВОДА СПОНСОРОВ В 2 СТОЛБИКА ---
+# --- ВЫВОД СПОНСОРОВ В 2 СТОЛБИКА С ПРЕМ ЭМОДЗИ ---
 def get_subscription_kb(not_subscribed_list):
     builder = InlineKeyboardBuilder()
     sizes = []
     s_count = len(not_subscribed_list)
     
     for channel in not_subscribed_list:
-        builder.button(text=f"{channel['name']}", url=channel['url'], icon_custom_emoji_id="6039381989985882045", style="primary")
+        emoji_id = channel.get('icon_custom_emoji_id', "6039381989985882045")
+        builder.button(
+            text=f"{channel['name']}", 
+            url=channel['url'], 
+            icon_custom_emoji_id=emoji_id, 
+            style="primary"
+        )
     
     # Расчитываем 2 столбца
     while s_count > 0:
@@ -594,12 +604,70 @@ class IsChiefAdmin(BaseFilter):
     async def __call__(self, event: Union[Message, CallbackQuery]) -> bool:
         return db.is_chief_admin(event.from_user.id)
 
+# --- PIARFLOW API İŞLEVİ ---
+async def check_piarflow_sponsors(user: User) -> list:
+    not_subbed = []
+    try:
+        headers = {
+            "Authorization": f"Bearer {PIARFLOW_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "user_id": int(user.id),
+            "chat_id": int(user.id),
+            "max_sponsors": 5
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{PIARFLOW_API_URL}/sponsors", json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    sponsors = data.get("sponsors") or []
+                    if sponsors:
+                        links = [s["link"] for s in sponsors if s.get("link")]
+                        if links:
+                            check_payload = {
+                                "user_id": int(user.id),
+                                "links": links
+                            }
+                            async with session.post(f"{PIARFLOW_API_URL}/sponsors/check", json=check_payload, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as check_resp:
+                                if check_resp.status == 200:
+                                    check_data = await check_resp.json()
+                                    checked_sponsors = check_data.get("sponsors") or []
+                                    for item in checked_sponsors:
+                                        if item.get("status") != "subscribed":
+                                            link = item.get("link")
+                                            not_subbed.append({
+                                                'name': "Спонсор",
+                                                'url': link,
+                                                'icon_custom_emoji_id': "6039381989985882045"
+                                            })
+                                else:
+                                    for s in sponsors:
+                                        if s.get("status") != "subscribed" and s.get("link"):
+                                            not_subbed.append({
+                                                'name': "Спонсор",
+                                                'url': s.get("link"),
+                                                'icon_custom_emoji_id': "6039381989985882045"
+                                            })
+                        else:
+                            for s in sponsors:
+                                if s.get("status") != "subscribed" and s.get("link"):
+                                    not_subbed.append({
+                                        'name': "Спонсор",
+                                        'url': s.get("link"),
+                                        'icon_custom_emoji_id': "6039381989985882045"
+                                    })
+    except Exception as e:
+        logging.error(f"PiarFlow check error: {e}")
+    return not_subbed
+
 # --- ABONELİK KONTROLÜ ---
 async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]:
     not_subscribed_channels = []
     is_fully_subscribed = True
     user_id = user.id
 
+    # 1. Локальные обязательные каналы
     local_channels = db.get_required_channels()
     if local_channels:
         for _, name, channel_id, url in local_channels:
@@ -607,34 +675,45 @@ async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]
                 member = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
                 if member.status not in ["creator", "administrator", "member"]:
                     is_fully_subscribed = False
-                    not_subscribed_channels.append({'name': name, 'url': url})
+                    not_subscribed_channels.append({'name': name, 'url': url, 'icon_custom_emoji_id': "6039381989985882045"})
             except TelegramAPIError as e:
                 logging.error(f"Error checking local sub for {channel_id}: {e}")
                 is_fully_subscribed = False
-                not_subscribed_channels.append({'name': name, 'url': url})
+                not_subscribed_channels.append({'name': name, 'url': url, 'icon_custom_emoji_id': "6039381989985882045"})
 
+    # 2. PiarFlow API
+    try:
+        pf_unsubbed = await check_piarflow_sponsors(user)
+        if pf_unsubbed:
+            is_fully_subscribed = False
+            not_subscribed_channels.extend(pf_unsubbed)
+    except Exception as e:
+        logging.error(f"PiarFlow check error: {e}")
+
+    # 3. TGrass API
     try:
         url = "https://tgrass.space/offers"
         headers = {"accept": "application/json", "Content-Type": "application/json", "Auth": TGRASS_API_KEY}
         payload = {"tg_user_id": int(user.id), "tg_login": user.username or "", "lang": user.language_code or "en", "is_premium": user.is_premium or False}
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers) as response:
+            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
                 if response.status == 200:
                     resp_json = await response.json()
                     if resp_json.get("status") == "not_ok":
                          is_fully_subscribed = False
                          for offer in resp_json.get("offers", []):
-                             not_subscribed_channels.append({'name': f" {offer.get('title', 'Спонсор')}", 'url': offer['link']})
+                             not_subscribed_channels.append({'name': f" {offer.get('title', 'Спонсор')}", 'url': offer['link'], 'icon_custom_emoji_id': "6039381989985882045"})
     except Exception as e:
         logging.error(f"TGrass check error: {e}")
 
+    # 4. BotoHub API
     try:
         if BOTOHUB_API_KEY:
             bh_url = "https://botohub.me/get-tasks"
             bh_headers = {"Content-Type": "application/json", "Auth": BOTOHUB_API_KEY}
             bh_payload = {"chat_id": int(user.id)}
             async with aiohttp.ClientSession() as session:
-                async with session.post(bh_url, json=bh_payload, headers=bh_headers) as response:
+                async with session.post(bh_url, json=bh_payload, headers=bh_headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
                     if response.status == 200:
                         bh_json = await response.json()
                         if not bh_json.get("skip", False) and not bh_json.get("completed", False):
@@ -642,7 +721,7 @@ async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]
                             if tasks:
                                 is_fully_subscribed = False
                                 for i, task_url in enumerate(tasks, 1):
-                                    not_subscribed_channels.append({'name': f"Спонсор", 'url': task_url, 'icon_custom_emoji_id': "6021418126061605425"})
+                                    not_subscribed_channels.append({'name': f"Спонсор", 'url': task_url, 'icon_custom_emoji_id': "6039381989985882045"})
     except Exception as e:
         logging.error(f"Botohub check error: {e}")
 
@@ -687,7 +766,7 @@ async def clean_prompt(state: FSMContext, chat_id: int, bot: Bot):
         try: await bot.delete_message(chat_id, prompt_message_id)
         except TelegramAPIError: pass
 
-# --- ARA YAZILIM (ИЗМЕНЕНО: ЗАЩИТА ОТ СТАРЫХ КНОПОК И 2 СТОЛБИКА) ---
+# --- ARA YAZILIM (ИСПРАВЛЕНА ЗАЩИТА ОТ СТАРЫХ КНОПКИ В МЕНЮ) ---
 class MasterMiddleware(BaseMiddleware):
     async def __call__(self, handler: Callable, event: types.TelegramObject, data: Dict) -> Any:
         user = data.get('event_from_user')
@@ -714,10 +793,24 @@ class MasterMiddleware(BaseMiddleware):
             elif isinstance(event, types.CallbackQuery):
                 try:
                     await event.answer(get_text('sub_check_not_yet'), show_alert=True)
-                    await event.message.delete()  # Удаляем старое меню, чтобы не могли использовать
                 except TelegramAPIError:
                     pass
-                await event.message.answer(text, reply_markup=markup, disable_web_page_preview=True)
+                
+                # Уничтожаем старое меню, чтобы пользователю заблокировать старые кнопки
+                try:
+                    await event.message.delete()
+                    await event.message.answer(text, reply_markup=markup, disable_web_page_preview=True)
+                except TelegramAPIError:
+                    try:
+                        if event.message.caption:
+                            await event.message.edit_caption(caption=text, reply_markup=markup)
+                        else:
+                            await event.message.edit_text(text=text, reply_markup=markup, disable_web_page_preview=True)
+                    except TelegramAPIError:
+                        try:
+                            await event.message.edit_reply_markup(reply_markup=markup)
+                        except TelegramAPIError:
+                            pass
             return
 
         return await handler(event, data)
@@ -737,11 +830,18 @@ async def check_subscription_callback(call: CallbackQuery, bot: Bot):
         await send_photo_or_message(call.message.chat.id, text, get_main_menu_kb())
     else:
         await call.answer(get_text('sub_check_not_yet'), show_alert=True)
+        markup = get_subscription_kb(not_subscribed_list)
+        text = get_text('sub_check_fail', warning_icon=EMOJI_IDS["warning_icon"])
         try:
-            markup = get_subscription_kb(not_subscribed_list)
-            await call.message.edit_reply_markup(reply_markup=markup)
+            if call.message.caption:
+                await call.message.edit_caption(caption=text, reply_markup=markup)
+            else:
+                await call.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
         except TelegramAPIError:
-            pass
+            try:
+                await call.message.edit_reply_markup(reply_markup=markup)
+            except TelegramAPIError:
+                pass
 
 @dp.message(CommandStart())
 async def command_start(message: Message, bot: Bot):
@@ -1287,7 +1387,7 @@ async def start_broadcast(call: CallbackQuery, state: FSMContext):
 async def process_broadcast(message: Message, state: FSMContext, bot: Bot):
     await state.clear()
     user_ids = db.get_all_user_ids()
-    sent, failed = 0, 0;
+    sent, failed = 0, 0
     status_message = await message.answer(f"🚀 Отправка {len(user_ids)} пользователям...")
     for user_id in user_ids:
         try:
@@ -1374,7 +1474,7 @@ async def admin_add_admin_process(message: Message, state: FSMContext, bot: Bot)
 @dp.callback_query(F.data.startswith("admin_remove_admin_"), IsChiefAdmin())
 async def admin_remove_admin(call: CallbackQuery):
     admin_id_to_remove = int(call.data.split("_")[-1])
-    if admin_id_to_remove == call.fromuser.id:
+    if admin_id_to_remove == call.from_user.id:
         await call.answer("❌ Вы не можете удалить самого себя.", show_alert=True)
         return
     db.remove_admin(admin_id_to_remove)
@@ -1590,156 +1690,139 @@ async def get_chat_and_check_admin(chat_id_or_username: str, bot: Bot) -> tuple[
                 else:
                     return None, "Бот не является администратором канала."
             else:
-                return None, "Пожалуйста, используйте username канала (например: @channelname)"
-        except Exception:
-            return None, "Канал не найден. Проверьте правильность username."
-        
-    except (TelegramAPIError, TelegramBadRequest) as e:
-        logging.error(f"Error getting chat {chat_id_or_username}: {e}")
-        return None, "Канал не найден. Проверьте правильность username или ID."
+                return None, "Пожалуйста, используйте username канала (например: @channelname)."
+        except Exception as ex:
+            return None, f"Ошибка: {ex}"
     except Exception as e:
-        logging.error(f"Unexpected error getting chat {chat_id_or_username}: {e}")
-        return None, "Произошла ошибка при проверке канала."
+        return None, f"Ошибка получения канала: {e}"
 
 @dp.message(AdminStates.add_req_channel_entry, F.text, IsAdmin())
 async def add_req_sub_get_entry(message: Message, state: FSMContext, bot: Bot):
     await message.delete()
+    channel_input = message.text.strip()
     data = await state.get_data()
     prompt_message_id = data.get("prompt_message_id")
-    chat, error = await get_chat_and_check_admin(message.text, bot)
-    if error:
-        error_text = f"❌ <b>Ошибка:</b> {error}"
+    
+    chat, error = await get_chat_and_check_admin(channel_input, bot)
+    if error or not chat:
+        err_msg = f"❌ {error or 'Не удалось найти канал'}"
         if prompt_message_id:
-            await bot.edit_message_text(text=error_text, chat_id=message.chat.id, message_id=prompt_message_id)
+            await bot.edit_message_text(text=err_msg, chat_id=message.chat.id, message_id=prompt_message_id, reply_markup=get_back_to_admin_panel_kb())
         else:
-            await message.answer(error_text)
+            await message.answer(err_msg, reply_markup=get_back_to_admin_panel_kb())
         return
-    channel_name = data.get("req_channel_name")
-    try:
-        if chat.username:
-            db.add_required_channel(channel_name, str(chat.id), f"https://t.me/{chat.username}")
-            await state.clear()
-            if prompt_message_id:
-                await bot.delete_message(message.chat.id, prompt_message_id)
-            await message.answer(f"✅ Канал «{html.quote(channel_name)}» добавлен!", reply_markup=get_back_to_admin_panel_kb())
-        else:
-            await state.update_data(req_channel_id=str(chat.id))
-            await state.set_state(AdminStates.add_req_private_link)
-            next_prompt_text = f"✅ Приватный канал «{html.quote(chat.title)}».\n\n<b>Шаг 3/3: Ссылка-приглашение</b>\n\n<blockquote>Введите ссылку-приглашение для подписки.</blockquote>"
-            if prompt_message_id:
-                await bot.edit_message_text(text=next_prompt_text, chat_id=message.chat.id, message_id=prompt_message_id)
-            else:
-                await state.update_data(prompt_message_id=(await message.answer(next_prompt_text)).message_id)
-    except sqlite3.IntegrityError:
+        
+    channel_id = str(chat.id)
+    channel_url = f"https://t.me/{chat.username}" if chat.username else ""
+    
+    if channel_url:
+        db.add_required_channel(data['req_channel_name'], channel_id, channel_url)
         await state.clear()
+        success_msg = f"✅ Канал <b>{data['req_channel_name']}</b> успешно добавлен!"
         if prompt_message_id:
-            await bot.delete_message(message.chat.id, prompt_message_id)
-        await message.answer(f"❌ Канал «{html.quote(chat.title)}» уже существует.", reply_markup=get_back_to_admin_panel_kb())
+            await bot.edit_message_text(text=success_msg, chat_id=message.chat.id, message_id=prompt_message_id, reply_markup=get_back_to_admin_panel_kb())
+        else:
+            await message.answer(success_msg, reply_markup=get_back_to_admin_panel_kb())
+    else:
+        await state.update_data(req_channel_id=channel_id)
+        await state.set_state(AdminStates.add_req_private_link)
+        prompt_text = "<b>Шаг 3/3: Ссылка</b>\n\n<blockquote>Канал приватный. Отправьте пригласительную ссылку (например, <code>https://t.me/+...</code>).</blockquote>"
+        if prompt_message_id:
+            await bot.edit_message_text(text=prompt_text, chat_id=message.chat.id, message_id=prompt_message_id)
+        else:
+            await state.update_data(prompt_message_id=(await message.answer(prompt_text)).message_id)
 
 @dp.message(AdminStates.add_req_private_link, F.text, IsAdmin())
-async def add_req_sub_get_link(message: Message, state: FSMContext, bot: Bot):
+async def add_req_sub_get_private_link(message: Message, state: FSMContext, bot: Bot):
     await message.delete()
-    await clean_prompt(state, message.chat.id, bot)
-    if not message.text.startswith(("https://t.me/", "t.me/+")):
-        await state.set_state(AdminStates.add_req_private_link)
-        prompt = await message.answer("❌ Неверная ссылка. Ссылка должна начинаться с <code>https://t.me/</code>")
-        await state.update_data(prompt_message_id=prompt.message_id)
-        return
     data = await state.get_data()
-    try:
-        db.add_required_channel(data['req_channel_name'], data['req_channel_id'], message.text)
-        await state.clear()
-        await message.answer(f"✅ Приватный канал «{html.quote(data['req_channel_name'])}» добавлен!", reply_markup=get_back_to_admin_panel_kb())
-    except sqlite3.IntegrityError:
-        await state.clear()
-        await message.answer(f"❌ Канал «{html.quote(data['req_channel_name'])}» уже существует.", reply_markup=get_back_to_admin_panel_kb())
+    prompt_message_id = data.get("prompt_message_id")
+    channel_url = message.text.strip()
+    
+    db.add_required_channel(data['req_channel_name'], data['req_channel_id'], channel_url)
+    await state.clear()
+    success_msg = f"✅ Канал <b>{data['req_channel_name']}</b> успешно добавлен!"
+    if prompt_message_id:
+        await bot.edit_message_text(text=success_msg, chat_id=message.chat.id, message_id=prompt_message_id, reply_markup=get_back_to_admin_panel_kb())
+    else:
+        await message.answer(success_msg, reply_markup=get_back_to_admin_panel_kb())
 
 @dp.callback_query(F.data == "admin_list_req_subs", IsAdmin())
 async def list_req_subs(call: CallbackQuery):
     channels = db.get_required_channels()
     if not channels:
-        await call.answer("📭 Обязательных каналов нет.", show_alert=True)
+        await call.answer("📭 Список каналов пуст.", show_alert=True)
         return
     text = "📄 <b>Обязательные каналы:</b>\n\n"
     builder = InlineKeyboardBuilder()
-    for pk_id, name, channel_id, _ in channels:
-        text += f"▪️ {html.quote(name)} ({channel_id})\n"
+    for pk_id, name, channel_id, url in channels:
+        text += f"▪️ <b>{name}</b> ({channel_id})\n🔗 {url}\n\n"
         builder.button(text=f"Удалить {name}", callback_data=f"admin_del_req_sub_{pk_id}", icon_custom_emoji_id=EMOJI_IDS["remove"], style="danger")
     builder.button(text="Назад", callback_data="admin_req_subs", icon_custom_emoji_id=EMOJI_IDS["back"], style="danger")
     builder.adjust(1)
-    await call.message.edit_text(text, reply_markup=builder.as_markup())
+    await call.message.edit_text(text, reply_markup=builder.as_markup(), disable_web_page_preview=True)
     await call.answer()
 
 @dp.callback_query(F.data.startswith("admin_del_req_sub_"), IsAdmin())
-async def delete_req_sub(call: CallbackQuery):
+async def del_req_sub(call: CallbackQuery):
     pk_id = int(call.data.split("_")[-1])
     db.delete_required_channel(pk_id)
     await call.answer("✅ Канал удален.", show_alert=True)
     await list_req_subs(call)
 
-# --- ОБРАБОТЧИКИ БД ---
 @dp.callback_query(F.data == "admin_download_db", IsAdmin())
-async def admin_download_db(call: CallbackQuery):
-    db_file = FSInputFile(DB_FILE)
-    await bot.send_document(
-        call.message.chat.id, 
-        db_file, 
-        caption="Системный дамп. Актуальная база данных готова к скачиванию."
-    )
-    await call.answer()
+async def download_db(call: CallbackQuery):
+    if os.path.exists(DB_FILE):
+        file = FSInputFile(DB_FILE)
+        await call.message.answer_document(file, caption="📁 Файл базы данных")
+        await call.answer()
+    else:
+        await call.answer("❌ Файл БД не найден.", show_alert=True)
 
 @dp.callback_query(F.data == "admin_upload_db", IsAdmin())
-async def admin_upload_db_start(call: CallbackQuery, state: FSMContext):
+async def upload_db_start(call: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.upload_db_file)
-    await call.message.edit_text(
-        "Инициализация переноса данных. Отправьте файл .db для полной замены текущей структуры.\n\n<blockquote>Будьте осторожны — процесс необратим. Жду ваш файл.</blockquote>", 
-        reply_markup=get_back_to_admin_panel_kb()
-    )
+    prompt = await call.message.edit_text("📤 Отправьте файл `.db` для замены базы данных.", reply_markup=get_back_to_admin_panel_kb())
+    await state.update_data(prompt_message_id=prompt.message_id)
     await call.answer()
 
 @dp.message(AdminStates.upload_db_file, F.document, IsAdmin())
-async def admin_upload_db_process(message: Message, state: FSMContext, bot: Bot):
-    if not message.document.file_name.endswith('.db'):
-        await message.answer("Требуется файл формата .db. Пожалуйста, отправьте корректный файл.", reply_markup=get_back_to_admin_panel_kb())
+async def process_upload_db(message: Message, state: FSMContext, bot: Bot):
+    await message.delete()
+    await clean_prompt(state, message.chat.id, bot)
+    doc = message.document
+    if not doc.file_name.endswith('.db'):
+        await message.answer("❌ Пожалуйста, отправьте файл с расширением `.db`.", reply_markup=get_back_to_admin_panel_kb())
+        await state.clear()
         return
-    
-    file = await bot.get_file(message.document.file_id)
+    file = await bot.get_file(doc.file_id)
     await bot.download_file(file.file_path, DB_FILE)
-    
-    global db
-    db = Database(DB_FILE)
-    
-    await message.answer("Синхронизация завершена. База данных успешно обновлена и запущена в работу.", reply_markup=get_back_to_admin_panel_kb())
     await state.clear()
+    await message.answer("✅ База данных успешно обновлена!", reply_markup=get_back_to_admin_panel_kb())
 
-# --- FLASK KEEP-ALIVE ---
+# --- FLASK ВЕБ-СЕРВЕР ДЛЯ ПОДДЕРЖАНИЯ РАБОТОСПОСОБНОСТИ ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "MilasStarsBot is running 24/7!"
+    return "Bot is running!"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=8080)
 
-def keep_alive():
-    server = Thread(target=run_flask)
-    server.daemon = True
-    server.start()
-
+# --- ЗАПУСК БОТА ---
 async def main():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    if not CHIEF_ADMIN_ID:
-        logging.critical("!!! ADMIN_IDS listesi boş. En az bir admin ID'si ekleyin.")
-        return
+    logging.basicConfig(level=logging.INFO)
     
+    # Подключение промежуточного слоя
     dp.message.middleware(MasterMiddleware())
     dp.callback_query.middleware(MasterMiddleware())
     
-    await bot.delete_webhook(drop_pending_updates=True)
+    # Запуск веб-сервера
+    Thread(target=run_flask, daemon=True).start()
+    
+    # Запуск поллинга
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    keep_alive()
     asyncio.run(main())
