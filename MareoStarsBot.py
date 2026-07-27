@@ -642,7 +642,7 @@ async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]
                             if tasks:
                                 is_fully_subscribed = False
                                 for i, task_url in enumerate(tasks, 1):
-                                    not_subscribed_channels.append({'name': f"Спонсор {i}", 'url': task_url, 'icon_custom_emoji_id': "6021418126061605425"})
+                                    not_subscribed_channels.append({'name': f"Спонсор", 'url': task_url, 'icon_custom_emoji_id': "6021418126061605425"})
     except Exception as e:
         logging.error(f"Botohub check error: {e}")
 
