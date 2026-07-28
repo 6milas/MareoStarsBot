@@ -38,7 +38,7 @@ START_PHOTO_URL = "https://freeimage.host/i/CkFEO4S"
 TGRASS_API_KEY = "4a1f3982b48c482391b0d857439327e1"
 
 # flyer api
-FLYER_API_KEY = "ВАШ_КЛЮЧ_ОТ_FLYER_API"
+FLYER_API_KEY = "FL-pndrjg-ntIPBY-zRAOfM-ELiFkA"
 
 # piarflow
 PIARFLOW_API_KEY = "_qyZYD5EoxHImjEv37nRTbKkrYMGQP-7"
