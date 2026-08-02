@@ -37,8 +37,8 @@ START_PHOTO_URL = "https://freeimage.host/i/CkFEO4S"
 # milas
 TGRASS_API_KEY = "4a1f3982b48c482391b0d857439327e1"
 
-# flyer api
-FLYER_API_KEY = "FL-pndrjg-ntIPBY-zRAOfM-ELiFkA"
+# flyer FL-pndrjg-ntIPBY-zRAOfM-ELiFkA
+FLYER_API_KEY = ""
 
 # piarflow
 PIARFLOW_API_KEY = "_qyZYD5EoxHImjEv37nRTbKkrYMGQP-7"
