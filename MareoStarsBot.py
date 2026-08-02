@@ -1758,7 +1758,7 @@ async def download_db_handler(call: CallbackQuery):
 @dp.callback_query(F.data == "admin_upload_db", IsChiefAdmin())
 async def upload_db_start(call: CallbackQuery, state: FSMContext):
     await state.update_data(prompt_message_id=prompt.message_id)
-        return
+    return
     file_id = message.document.file_id
     file = await bot.get_file(file_id)
     await bot.download_file(file.file_path, DB_FILE)
