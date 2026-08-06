@@ -210,6 +210,359 @@ def get_main_menu_kb():
     
     builder.button(
         text=get_text('btn_withdraw'), 
+        callback_data="withdraw", 
+        icon_custom_emoji_id=EMOJI_IDS["withdraw"],
+        style="danger"
+    )
+    
+    builder.button(
+        text=get_text('btn_top'), 
+        callback_data="top_referrals",
+        icon_custom_emoji_id=EMOJI_IDS["top"],
+        style="primary"
+    )
+    
+    builder.adjust(1, 2, 1)
+    return builder.as_markup()
+
+def get_profile_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text('btn_bonus'), callback_data="bonus", icon_custom_emoji_id=EMOJI_IDS["bonus"], style="success")
+    builder.button(text=get_text('btn_promo'), callback_data="promo", icon_custom_emoji_id=EMOJI_IDS["promo"], style="primary")
+    builder.button(text=get_text('btn_back_to_menu'), callback_data="main_menu", icon_custom_emoji_id=EMOJI_IDS["back"], style="danger")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+def get_invite_kb(ref_link: str):
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=get_text('btn_copy_link'), 
+        copy_text=CopyTextButton(text=ref_link),
+        style="primary"
+    )
+    builder.button(
+        text=get_text('btn_back'), 
+        callback_data="main_menu", 
+        icon_custom_emoji_id=EMOJI_IDS["back"],
+        style="danger"
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_back_kb(callback_data="main_menu"):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text('btn_back'), callback_data=callback_data, icon_custom_emoji_id=EMOJI_IDS["back"], style="danger")
+    return builder.as_markup()
+
+def get_withdraw_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="25 ⭐", callback_data="withdraw_gift_25_🌹", icon_custom_emoji_id=EMOJI_IDS["rose"], style="primary")
+    builder.button(text="50 ⭐", callback_data="withdraw_gift_50_💐", icon_custom_emoji_id=EMOJI_IDS["bouquet"], style="primary")
+    builder.button(text="100 ⭐", callback_data="withdraw_gift_100_🏆", icon_custom_emoji_id=EMOJI_IDS["trophy"], style="primary")
+    builder.button(text=get_text('btn_back'), callback_data="main_menu", icon_custom_emoji_id=EMOJI_IDS["back"], style="danger")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+def get_withdraw_submitted_kb():
+    builder = InlineKeyboardBuilder()
+    if PAYMENTS_CHANNEL_LINK and "YourPaymentsChannel" not in PAYMENTS_CHANNEL_LINK:
+        builder.button(text=get_text('btn_check_status'), url=PAYMENTS_CHANNEL_LINK, icon_custom_emoji_id=EMOJI_IDS["money"], style="success")
+    builder.button(text=get_text('btn_back_to_menu'), callback_data="main_menu", icon_custom_emoji_id=EMOJI_IDS["back"], style="danger")
+    return builder.as_markup()
+
+def get_cancel_kb(callback_data="cancel_action"):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text('btn_cancel'), callback_data=callback_data, icon_custom_emoji_id=EMOJI_IDS["remove"], style="danger")
+    return builder.as_markup()
+
+def get_admin_kb(user_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Рассылка", callback_data="admin_broadcast", icon_custom_emoji_id=EMOJI_IDS["broadcast"], style="primary")
+    builder.button(text="Статистика", callback_data="admin_stats", icon_custom_emoji_id=EMOJI_IDS["stats"], style="primary")
+    builder.button(text="Статистика TGrass", callback_data="admin_stats_tgrass", icon_custom_emoji_id=EMOJI_IDS["stats"], style="primary")
+    builder.button(text="Статистика PiarFlow", callback_data="admin_stats_piarflow", icon_custom_emoji_id=EMOJI_IDS["stats"], style="primary")
+    builder.button(text="Бонус настройки", callback_data="admin_bonus_settings", icon_custom_emoji_id=EMOJI_IDS["edit"], style="primary")
+    builder.button(text="Промокоды", callback_data="admin_promo_menu", icon_custom_emoji_id=EMOJI_IDS["promo"], style="primary")
+    builder.button(text="Каналы", callback_data="admin_req_subs", icon_custom_emoji_id=EMOJI_IDS["lock"], style="primary")
+    builder.button(text="Баланс", callback_data="admin_balance_change", icon_custom_emoji_id=EMOJI_IDS["money"], style="primary")
+    builder.button(text="Реферальный бонус", callback_data="admin_ref_bonus", icon_custom_emoji_id=EMOJI_IDS["star"], style="primary")    
+    if db.is_chief_admin(user_id):
+        builder.button(text="Админы", callback_data="admin_manage_admins", icon_custom_emoji_id=EMOJI_IDS["lock"], style="primary")
+    builder.button(text="Скачать БД", callback_data="admin_download_db", icon_custom_emoji_id=EMOJI_IDS["db_download"], style="primary")
+    builder.button(text="Установить БД", callback_data="admin_upload_db", icon_custom_emoji_id=EMOJI_IDS["db_upload"], style="primary")
+    builder.adjust(2)
+    return builder.as_markup()
+
+def get_back_to_admin_panel_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Назад в админ-панель", callback_data="admin_panel", icon_custom_emoji_id=EMOJI_IDS["back"], style="danger")
+    return builder.as_markup()
+
+def get_admin_withdraw_kb(request_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Одобрить", callback_data=f"withdraw_approve_{request_id}", icon_custom_emoji_id=EMOJI_IDS["check"], style="success")
+    builder.button(text="Отклонить", callback_data=f"withdraw_decline_{request_id}", icon_custom_emoji_id=EMOJI_IDS["remove"], style="danger")
+    builder.adjust(2)
+    return builder.as_markup()
+
+def get_payment_channel_kb(request_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Отправить", callback_data=f"payment_send_{request_id}", style="success")
+    builder.button(text="❌ Отключить", callback_data=f"payment_decline_{request_id}", style="danger")
+    builder.adjust(2)
+    return builder.as_markup()
+
+def get_payment_channel_status_text(request_id: int, user_id: int, amount: float, gift_name: str, status: str = "pending"):
+    username = db.get_user_username(user_id)
+    
+    if status == "pending":
+        status_text = f"<tg-emoji emoji-id=\"{EMOJI_IDS['status_icon']}\">🔄</tg-emoji> Ожидает обработки <tg-emoji emoji-id=\"{EMOJI_IDS['status_wait']}\">⚙️</tg-emoji>"
+    elif status == "sent":
+        status_text = f"<tg-emoji emoji-id=\"{EMOJI_IDS['gift_sent']}\">🎁</tg-emoji> Подарок отправлен"
+    elif status == "declined":
+        status_text = f"<tg-emoji emoji-id=\"{EMOJI_IDS['declined']}\">🚫</tg-emoji> Отказано"
+    else:
+        status_text = f"<tg-emoji emoji-id=\"{EMOJI_IDS['status_icon']}\">🔄</tg-emoji> Ожидает обработки"
+    
+    text = (
+        f"<tg-emoji emoji-id=\"{EMOJI_IDS['check_premium']}\">✅</tg-emoji> <b>Заявка на вывод №{request_id}</b>\n\n"
+        f"<tg-emoji emoji-id=\"{EMOJI_IDS['user_icon']}\">👤</tg-emoji> <b>Пользователь:</b> @{username} | ID {user_id}\n"
+        f"<tg-emoji emoji-id=\"{EMOJI_IDS['star_premium']}\">⭐️</tg-emoji> <b>Сумма:</b> {amount} ⭐\n"
+        f"<tg-emoji emoji-id=\"{EMOJI_IDS['gift_icon']}\">🎁</tg-emoji> <b>Подарок:</b> {gift_name}\n\n"
+        f"{status_text}"
+    )
+    return text
+
+# --- VERİTABANI ---
+class Database:
+    def __init__(self, db_file):
+        self.connection = sqlite3.connect(db_file)
+        self.cursor = self.connection.cursor()
+        self.setup_database()
+
+    def setup_database(self):
+        with self.connection:
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    balance REAL DEFAULT 0,
+                    referrer_id INTEGER,
+                    last_bonus_time DATETIME,
+                    join_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    referral_processed BOOLEAN DEFAULT 0
+                )''')
+            self.cursor.execute('''CREATE TABLE IF NOT EXISTS used_promocodes (user_id INTEGER, code TEXT, PRIMARY KEY (user_id, code))''')
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS withdrawal_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    uid TEXT NOT NULL UNIQUE,
+                    user_id INTEGER NOT NULL,
+                    username TEXT,
+                    amount REAL NOT NULL,
+                    gift_name TEXT,
+                    status TEXT DEFAULT 'pending',
+                    request_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    decline_reason TEXT,
+                    details TEXT,
+                    payment_channel_message_id INTEGER
+                )''')
+            try: self.cursor.execute("ALTER TABLE withdrawal_requests ADD COLUMN decline_reason TEXT")
+            except: pass
+            try: self.cursor.execute("ALTER TABLE withdrawal_requests ADD COLUMN details TEXT")
+            except: pass
+            try: self.cursor.execute("ALTER TABLE withdrawal_requests ADD COLUMN payment_channel_message_id INTEGER")
+            except: pass
+            self.cursor.execute('''CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)''')
+            self.cursor.execute('''CREATE TABLE IF NOT EXISTS promocodes (code TEXT PRIMARY KEY, reward REAL, activations_left INTEGER)''')
+            self.cursor.execute('''CREATE TABLE IF NOT EXISTS required_channels (id INTEGER PRIMARY KEY AUTOINCREMENT, channel_name TEXT NOT NULL, channel_id TEXT NOT NULL UNIQUE, channel_url TEXT NOT NULL)''')
+            self.cursor.execute('''CREATE TABLE IF NOT EXISTS admins (user_id INTEGER PRIMARY KEY, is_chief BOOLEAN DEFAULT 0)''')
+            self.set_setting_if_not_exists('ref_bonus', '1.5')
+            self.set_setting_if_not_exists('daily_bonus_min', '0.1')
+            self.set_setting_if_not_exists('daily_bonus_max', '0.2')
+            if CHIEF_ADMIN_ID:
+                self.cursor.execute("UPDATE admins SET is_chief = 0")
+                self.cursor.execute("INSERT OR REPLACE INTO admins (user_id, is_chief) VALUES (?, 1)", (CHIEF_ADMIN_ID,))
+
+    def add_user(self, user: User, referrer_id=None):
+        with self.connection:
+            self.cursor.execute("INSERT OR IGNORE INTO users (user_id, username, first_name, referrer_id) VAL# milas
+TGRASS_API_KEY = "4a1f3982b48c482391b0d857439327e1"
+
+# flyer FL-pndrjg-ntIPBY-zRAOfM-ELiFkA
+FLYER_API_KEY = ""
+
+# piarflow
+PIARFLOW_API_KEY = "_qyZYD5EoxHImjEv37nRTbKkrYMGQP-7"
+PIARFLOW_API_URL = "https://piarflow.com/v1"
+
+# milas - CUSTOM EMOJILER
+EMOJI_IDS = {
+    "start": "5895288332581082241",
+    "star": "5258185631355378853",
+    "withdraw": "6039573425268201570",
+    "profile": "5316727448644103237",
+    "bonus": "6032644646587338669",
+    "promo": "5382327529287720847",
+    "top": "5440539497383087970",
+    "back": "5983506750387523533",
+    "check": "5206607081334906820",
+    "lock": "5463200466391298413",
+    "stats": "5936143551854285132",
+    "refresh": "6030657343744644592",
+    "broadcast": "6021418126061605425",
+    "edit": "5359488727158634349",
+    "add": "5359651386160068849",
+    "remove": "5359651386160068849",
+    "list": "6030657343744644592",
+    "warning": "5463200466391298413",
+    "success": "5206607081334906820",
+    "money": "5936143551854285132",
+    "phone": "6021418126061605425",
+    "people": "5463200466391298413",
+    "history": "6030657343744644592",
+    "info": "5359488727158634349",
+    "time": "6030657343744644592",
+    "link": "5271604874419647061",
+    "profile_icon": "5373012449597335010",
+    "id_icon": "5445353829304387411",
+    "balance_icon": "5287231198098117669",
+    "star_icon": "5954135079662916434",
+    "friends_icon": "5372926953978341366",
+    "gift_icon": "5850323366476519158",
+    "celebration": "5461151367559141950",
+    "warning_icon": "5274099962655816924",
+    "check_premium": "5427009714745517609",
+    "user_icon": "5373012449597335010",
+    "star_premium": "5954135079662916434",
+    "status_icon": "5264727218734524899",
+    "gear_icon": "5341715473882955310",
+    "gift_sent": "5199749070830197566",
+    "declined": "5825434739665803309",
+    "rose": "5280947338821524402",
+    "bouquet": "5280774333243873175",
+    "trophy": "5280769763398671636",
+    "card_icon": "5445353829304387411",
+    "star_premium_icon": "5954135079662916434",
+    "status_wait": "5341715473882955310",
+    "db_download": "6039802767931871481",
+    "db_upload": "5963103826075456248"
+}
+
+# --- METİNLER ---
+TEXTS = {
+    "start": "<tg-emoji emoji-id=\"{start_emoji}\">😎</tg-emoji> <b>Добро пожаловать</b>",
+    "profile": "<tg-emoji emoji-id=\"{profile_icon}\">👤</tg-emoji> <b>Имя:</b> @{username}\n"
+               "<tg-emoji emoji-id=\"{id_icon}\">💳</tg-emoji> <b>ID:</b> <code>{user_id}</code>\n"
+               "<tg-emoji emoji-id=\"{balance_icon}\">💰</tg-emoji> <b>Баланс:</b> {balance} <tg-emoji emoji-id=\"{star_icon}\">⭐️</tg-emoji>\n"
+               "<tg-emoji emoji-id=\"{friends_icon}\">👥</tg-emoji> <b>Приглашено друзей:</b> {referrals_count}",
+    "invite": "<tg-emoji emoji-id=\"{star_emoji}\">⭐️</tg-emoji> <b>Пригласить друзей</b>\n\n"
+              "За каждого друга, который перейдет по твоей ссылке, ты получаешь <b>{ref_bonus}</b> <tg-emoji emoji-id=\"{star_emoji}\">⭐️</tg-emoji>!\n\n"
+              "<tg-emoji emoji-id=\"{link_emoji}\">🔗</tg-emoji> <b>Твоя реферальная ссылка:</b>\n"
+              "<code>{ref_link}</code>\n\n"
+              "<tg-emoji emoji-id=\"{celebration_emoji}\">🎉</tg-emoji> Приглашай по этой ссылке своих друзей, отправляй её во все чаты и зарабатывай Звёзды!",
+    "withdraw_title": "<tg-emoji emoji-id=\"{withdraw_emoji}\">📤</tg-emoji> <b>Вывод средств</b>\n\nОбменяйте ваши звёзды на подарки!\n\n"
+                      "<blockquote><tg-emoji emoji-id=\"{card_icon}\">💳</tg-emoji> <b>Ваш баланс:</b> {balance} <tg-emoji emoji-id=\"{star_premium_icon}\">⭐️</tg-emoji></blockquote>\n\n",
+    "bonus": "<tg-emoji emoji-id=\"{bonus_emoji}\">🎁</tg-emoji> <b>Ежедневный бонус</b>\n\n"
+             "<blockquote>Вы можете получить случайный бонус один раз в 24 часа! Нажмите на кнопку, чтобы испытать удачу.</blockquote>",
+    "bonus_claimed": "🎁 Поздравляем! Вы получили {bonus_amount} ⭐!",
+    "bonus_wait": "😔 Следующий бонус через {hours} ч. {minutes} мин.",
+    "promo": "<tg-emoji emoji-id=\"{gift_icon}\">🎁</tg-emoji> <b>Введите промокод:</b>\n\n<blockquote>Пример: <code>STAR50</code></blockquote>",
+    "promo_success": "✅ Промокод активирован! Вам начислено {reward} ⭐.",
+    "promo_fail_used": "🚫 Вы уже использовали этот промокод.",
+    "promo_fail_general": "❌ Промокод не существует или истек.",
+    "top": "<tg-emoji emoji-id=\"{top_emoji}\">🥇</tg-emoji> <b>Топ пользователей</b>\n\n<blockquote>Кто здесь самый активный? Узнайте лидеров по звёздам и приглашениям.</blockquote>",
+    "top_balance_title": "<tg-emoji emoji-id=\"{top_emoji}\">🥇</tg-emoji> <b>Топ-5 по звёздам:</b>\n\n",
+    "top_referrals_title": "<tg-emoji emoji-id=\"{top_emoji}\">🥇</tg-emoji> <b>Топ 5 рефералов за 24 часа:</b>\n\n",
+    "top_no_users": "<i>Никого нет.</i>",
+    "top_not_in_top": "\n\n🚫 Ты не попал в топ! | {count} рефералов за 24ч.",
+    "request_submitted_for_review": "✅ Твоя заявка <code>#{request_uid}</code> отправлена на рассмотрение. Ожидай одобрения от администратора в течении нескольких дней.",
+    "btn_earn": "Пригласить друга",
+    "btn_withdraw": "Вывести",
+    "btn_profile": "Мой профиль",
+    "btn_bonus": "Бонус",
+    "btn_promo": "Промокод",
+    "btn_top": "Топ",
+    "btn_invite": "Пригласить друзей",
+    "btn_back": "Назад",
+    "btn_back_to_menu": "Вернуться в меню",
+    "btn_copy_link": "Реф ссылка",
+    "btn_cancel": "Отмена",
+    "btn_top_balance": "Топ по звёздам",
+    "btn_top_referrals": "Топ по рефералам",
+    "btn_check_status": "Канал выплат",
+    "sub_check_fail": "<tg-emoji emoji-id=\"{warning_icon}\">❗️</tg-emoji> <b>Для использования бота необходимо подписаться на каналы:</b>",
+    "sub_check_button": "Я подписался",
+    "sub_check_success": "✅ Спасибо за подписку!",
+    "sub_check_not_yet": "❗️ Вы еще не подписались на все каналы.",
+    "referral_notification": "🎉 По вашей ссылке присоединился новый пользователь: {new_user_display}!\nВам начислено <b>{ref_bonus}</b> ⭐.",
+    "alert_action_canceled": "Действие отменено",
+    "alert_need_more_refs": "❗️ Для вывода нужно пригласить ещё {diff} друзей.",
+    "alert_pending_withdrawal": "❗️ У вас уже есть заявка на рассмотрении.",
+    "alert_insufficient_stars": "❌ Минимальная сумма вывода 25⭐. У вас: {balance}⭐",
+    "status_approved": "✅ Ваша заявка (#{uid}) одобрена! Списано {amount} ⭐ за «{gift_name}».",
+    "status_declined": "❌ Ваша заявка (#{uid}) отклонена.\n\nПричина: {reason}",
+    "link_copied": "✅ Реферальная ссылка скопирована в буфер обмена!",
+}
+
+def get_text(key: str, **kwargs):
+    text = TEXTS.get(key, f"_{key}_")
+    if kwargs:
+        return text.format(**kwargs)
+    return text
+
+# --- ВЫВОД СПОНСОРОВ В 2 СТОЛБИКА С ПРЕМ ЭМОДЗИ ---
+def get_subscription_kb(not_subscribed_list):
+    builder = InlineKeyboardBuilder()
+    sizes = []
+    s_count = len(not_subscribed_list)
+    
+    for channel in not_subscribed_list:
+        emoji_id = channel.get('icon_custom_emoji_id', "6039381989985882045")
+        builder.button(
+            text=f"{channel['name']}", 
+            url=channel['url'], 
+            icon_custom_emoji_id=emoji_id, 
+            style="primary"
+        )
+    
+    # Расчитываем 2 столбца
+    while s_count > 0:
+        if s_count >= 2:
+            sizes.append(2)
+            s_count -= 2
+        else:
+            sizes.append(1)
+            s_count -= 1
+            
+    # Кнопка проверки в самом низу
+    builder.button(text=get_text('sub_check_button'), callback_data="check_subscription", icon_custom_emoji_id=EMOJI_IDS["check"], style="success")
+    sizes.append(1)
+    
+    builder.adjust(*sizes)
+    return builder.as_markup()
+
+# --- BUTONLAR ---
+def get_main_menu_kb():
+    builder = InlineKeyboardBuilder()
+    
+    builder.button(
+        text=get_text('btn_earn'), 
+        callback_data="earn", 
+        icon_custom_emoji_id=EMOJI_IDS["star"],
+        style="success"
+    )
+    
+    builder.button(
+        text=get_text('btn_profile'), 
+        callback_data="profile", 
+        icon_custom_emoji_id=EMOJI_IDS["profile"],
+        style="danger"
+    )
+    
+    builder.button(
+        text=get_text('btn_withdraw'), 
         callback_data="wiimportJI_IDS["withdraw"],
         style="danger"
     )
