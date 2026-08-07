@@ -1,4 +1,4 @@
-aiohttp0
+aiogram
 aiohttp
-Flask
+flask
 requests
