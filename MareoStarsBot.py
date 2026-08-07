@@ -702,7 +702,7 @@ async def run_full_subscription_check(user: User, bot: Bot) -> tuple[bool, list]
                     if resp_json.get("status") == "not_ok":
                          is_fully_subscribed = False
                          for offer in resp_json.get("offers", []):
-                             not_subscribed_channels.append({'name': f" {offer.get('title', 'Спонсор')}", 'url': offer['link'], 'icon_custom_emoji_id': "6039381989985882045"})
+                             not_subscribed_channels.append({'name': f" {offer.get('title', 'Спонсор TGrass')}", 'url': offer['link'], 'icon_custom_emoji_id': "6039381989985882045"})
     except Exception as e:
         logging.error(f"TGrass check error: {e}")
 
